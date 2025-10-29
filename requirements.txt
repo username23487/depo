@@ -1,0 +1,4 @@
+# requirements.txt
+Flask
+Flask-SocketIO
+gunicorn # Sunucu kodunu daha verimli çalıştırmak için
