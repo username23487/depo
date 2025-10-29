@@ -93,3 +93,5 @@ def esya_sat(depo_icerigi: Dict[str, Any]) -> Tuple[int, Dict[str, int]]:
         satis_detaylari[esya_adi] = esya_satis_geliri
         
     return toplam_satis_geliri, satis_detaylari
+
+# --- KODUNUZUN SONU ---

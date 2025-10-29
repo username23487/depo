@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Depo Savaşları: Oda Girişi</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        .container { width: 300px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        input { margin: 10px 0; padding: 10px; width: 90%; display: block; }
+        button { padding: 10px 20px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏚️ Depo Savaşları</h1>
+        <form method="POST" action="/oyna">
+            <input type="text" name="username" placeholder="Kullanıcı Adınız" required>
+            <input type="text" name="room_code" placeholder="Oda Kodu (örn: ANKARA1)" required>
+            <button type="submit">Odaya Katıl / Başlat</button>
+        </form>
+    </div>
+</body>
+</html>

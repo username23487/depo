@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Depo Savaşı: {{ session['room'] }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <style>
+        /* Basit CSS stil kodları, daha sonra geliştirilebilir */
+        body { font-family: sans-serif; display: flex; max-width: 1000px; margin: 0 auto; }
+        #depo-bilgi, #teklif-alani { flex: 1; padding: 20px; }
+        #teklif-alani { border-left: 1px solid #eee; }
+        .teklif-input input { padding: 8px; width: 70%; }
+        .teklif-input button { padding: 8px 15px; }
+        #mesajlar { max-height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="depo-bilgi">
+        <h2>🏢 Oda: {{ session['room'] }} ({{ session['username'] }})</h2>
+        <p>Depo Büyüklüğü: <strong>{{ oda.depo_bilgisi.buyukluk }}</strong> | Durum: <strong>{{ oda.depo_bilgisi.durum }}</strong></p>
+
+        <h3>📦 Depo İçeriği (1.5s Gözlem)</h3>
+        <ul id="esya-listesi">
+            {% for esya_adi, detay in oda.depo_bilgisi.icerik.items() %}
+                <li>{{ detay.sayi }}x {{ esya_adi | safe }} 
+                    <span class="deger-ipucu">(Birim Fiyat: {{ detay.birim_deger }})</span>
+                </li>
+            {% endfor %}
+        </ul>
+        <hr>
+        <p>⚠️ **TOPLAM DEĞER GİZLİDİR!** Hesaplamayı Hızlı Yapın.</p>
+    </div>
+
+    <div id="teklif-alani">
+        <h2>🔥 Açık Artırma</h2>
+        
+        <p id="kalan-sure">⏳ Gözlem Süresi: Başlamadı / Rakipler bekleniyor...</p>
+        
+        <p>Mevcut Teklif: <strong id="mevcut-teklif">{{ oda.teklif }}</strong> ($)</p>
+        <p>Lider: <span id="kazanan-isim">{{ oda.kazanan }}</span></p>
+
+        <div class="teklif-input">
+            <input type="number" id="teklif-miktari" placeholder="Teklifiniz (Min: {{ oda.teklif + depo_mantigi.MIN_TEKLIF_ARTISI }})" min="{{ oda.teklif + depo_mantigi.MIN_TEKLIF_ARTISI }}" required>
+            <button onclick="teklifGonder()">Teklif Ver</button>
+        </div>
+
+        <hr>
+        <h3>Aktif Oyuncular</h3>
+        <ul id="oyuncu-listesi">
+            {% for oyuncu_sid, oyuncu_adi in oda.oyuncular.items() %}
+                <li>{{ oyuncu_adi }}</li>
+            {% endfor %}
+        </ul>
+
+        <div id="mesajlar"></div>
+    </div>
+
+    <script>
+        const socket = io(); // SocketIO'yu başlat
+
+        // Odaya katıldığımızı sunucuya bildir
+        socket.on('connect', function() {
+            socket.emit('join', { username: '{{ session["username"] }}', room: '{{ session["room"] }}' });
+        });
+
+        // Yeni bir oyuncu katıldığında veya mesaj geldiğinde
+        socket.on('oda_guncelle', function(data) {
+            document.getElementById('mesajlar').innerHTML += `<p><em>${data.mesaj}</em></p>`;
+            // Oyuncu listesini güncelle
+            const oyuncuListesi = document.getElementById('oyuncu-listesi');
+            oyuncuListesi.innerHTML = data.oyuncular.map(o => `<li>${o}</li>`).join('');
+        });
+
+        // Teklif güncellendiğinde
+        socket.on('teklif_guncelle', function(data) {
+            const minArtis = {{ depo_mantigi.MIN_TEKLIF_ARTISI }};
+            const yeniTeklif = data.teklif;
+            document.getElementById('mevcut-teklif').innerText = yeniTeklif;
+            document.getElementById('kazanan-isim').innerText = data.kazanan;
+            
+            // Input alanını ve minimum teklif değerini güncelle
+            const teklifInput = document.getElementById('teklif-miktari');
+            teklifInput.placeholder = `Teklifiniz (Min: ${yeniTeklif + minArtis})`;
+            teklifInput.min = yeniTeklif + minArtis;
+            teklifInput.value = ''; // Inputu temizle
+            
+            document.getElementById('mesajlar').innerHTML += `<p>📢 <b>${data.kazanan}</b>: ${yeniTeklif} $!</p>`;
+        });
+        
+        // Gözlem süresi başladığında (app.py'den tetiklenecek)
+        socket.on('gozlem_baslat', function(data) {
+            alert(`Gözlem başladı! ${data.sure} saniyeniz var!`);
+            let sure = data.sure;
+            const timerElement = document.getElementById('kalan-sure');
+            timerElement.innerText = `⏳ Gözlem Süresi: ${sure} saniye`;
+
+            const interval = setInterval(() => {
+                sure -= 1;
+                timerElement.innerText = `⏳ Gözlem Süresi: ${sure} saniye`;
+                if (sure <= 0) {
+                    clearInterval(interval);
+                    timerElement.innerText = "🔥🔥 AÇIK ARTIRMA BAŞLADI! 🔥🔥";
+                    // Teklif alanını aktif et
+                }
+            }, 1000);
+        });
+
+        // Teklif Gönderme Fonksiyonu
+        function teklifGonder() {
+            const teklifMiktari = document.getElementById('teklif-miktari').value;
+            const mevcutTeklif = parseInt(document.getElementById('mevcut-teklif').innerText);
+            const minGerekli = mevcutTeklif + {{ depo_mantigi.MIN_TEKLIF_ARTISI }};
+
+            if (parseInt(teklifMiktari) >= minGerekli) {
+                socket.emit('teklif_gonder', { teklif: teklifMiktari });
+            } else {
+                alert(`Teklifiniz minimum ${minGerekli} olmalıdır!`);
+            }
+        }
+    </script>
+</body>
+</html>
